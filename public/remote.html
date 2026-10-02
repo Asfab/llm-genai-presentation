@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+<title>Presenter Remote</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    background: #09090B;
+    color: #FAFAFA;
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    -webkit-tap-highlight-color: transparent;
+    overflow: hidden;
+  }
+
+  /* PIN screen */
+  .pin-screen {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 24px;
+    gap: 24px;
+  }
+  .pin-screen .lock-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(124, 58, 237, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+  }
+  .pin-screen h1 {
+    font-size: 22px;
+    font-weight: 700;
+    text-align: center;
+  }
+  .pin-screen p {
+    font-size: 14px;
+    color: rgba(255,255,255,0.4);
+    text-align: center;
+    line-height: 1.5;
+  }
+  .pin-input {
+    width: 200px;
+    height: 56px;
+    border: 2px solid rgba(255,255,255,0.12);
+    border-radius: 14px;
+    background: rgba(255,255,255,0.05);
+    color: #FAFAFA;
+    font-size: 28px;
+    font-weight: 800;
+    text-align: center;
+    letter-spacing: 0.3em;
+    outline: none;
+    transition: border-color 0.2s;
+    font-family: 'DM Sans', system-ui, sans-serif;
+  }
+  .pin-input:focus {
+    border-color: #7C3AED;
+  }
+  .pin-input.error {
+    border-color: #EF4444;
+    animation: shake 0.4s ease;
+  }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-8px); }
+    75% { transform: translateX(8px); }
+  }
+  .pin-btn {
+    width: 200px;
+    height: 50px;
+    border: none;
+    border-radius: 14px;
+    background: #7C3AED;
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    transition: transform 0.1s;
+  }
+  .pin-btn:active { transform: scale(0.96); }
+  .pin-error-text {
+    font-size: 13px;
+    color: #EF4444;
+    height: 18px;
+  }
+
+  /* Main remote UI */
+  .remote-ui { display: none; flex-direction: column; flex: 1; }
+  .remote-ui.active { display: flex; }
+
+  .header {
+    padding: 16px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    flex-shrink: 0;
+  }
+  .header .badge {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #7C3AED;
+  }
+  .header .status {
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: rgba(255,255,255,0.4);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .header .status.retrying #statusText {
+    animation: pulse-retry 1s ease infinite;
+  }
+  @keyframes pulse-retry {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
+  }
+  .header .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #EF4444;
+    transition: background 0.3s;
+  }
+  .header .dot.connected { background: #22C55E; }
+
+  .slide-counter {
+    padding: 20px 20px 12px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .slide-counter .num {
+    font-size: 48px;
+    font-weight: 800;
+    color: #FAFAFA;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .slide-counter .of {
+    font-size: 14px;
+    color: rgba(255,255,255,0.3);
+    margin-top: 4px;
+  }
+
+  .slide-title {
+    padding: 0 20px 16px;
+    text-align: center;
+    font-size: 22px;
+    font-weight: 600;
+    color: #FAFAFA;
+    line-height: 1.3;
+    flex-shrink: 0;
+  }
+
+  .progress-bar {
+    margin: 0 20px 16px;
+    height: 3px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 2px;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .progress-bar .fill {
+    height: 100%;
+    background: #7C3AED;
+    border-radius: 2px;
+    transition: width 0.3s ease;
+  }
+
+  .timer-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 20px 14px;
+    flex-shrink: 0;
+  }
+  .timer-cell {
+    flex: 1;
+    background: rgba(255,255,255,0.04);
+    border-radius: 10px;
+    padding: 8px 10px;
+    text-align: center;
+  }
+  .timer-cell .t-label {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: rgba(255,255,255,0.25);
+    margin-bottom: 3px;
+  }
+  .timer-cell .t-value {
+    font-size: 20px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    color: #FAFAFA;
+  }
+  .timer-cell .t-start {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #7C3AED;
+    margin-top: 2px;
+    animation: pulse-start 2s ease infinite;
+  }
+  @keyframes pulse-start {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+  }
+  .timer-cell .t-budget {
+    font-size: 10px;
+    color: rgba(255,255,255,0.3);
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+  .timer-cell.warn .t-value { color: #FBBF24; }
+  .timer-cell.over .t-value { color: #EF4444; }
+  .pace-cell {
+    min-width: 72px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 10px;
+    padding: 8px 10px;
+    text-align: center;
+  }
+  .pace-cell .t-label {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: rgba(255,255,255,0.25);
+    margin-bottom: 3px;
+  }
+  .pace-cell .pace-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 6px;
+    display: inline-block;
+    line-height: 1;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .pace-badge.ahead { background: rgba(34,197,94,0.15); color: #22C55E; }
+  .pace-badge.on-track { background: rgba(124,58,237,0.15); color: #A78BFA; }
+  .pace-badge.behind { background: rgba(251,191,36,0.15); color: #FBBF24; }
+  .pace-badge.over-time { background: rgba(239,68,68,0.15); color: #EF4444; }
+
+  .notes {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 20px 16px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .notes-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: rgba(255,255,255,0.3);
+    margin-bottom: 10px;
+  }
+  .notes-text {
+    font-size: 18px;
+    line-height: 1.7;
+    color: rgba(255,255,255,0.7);
+  }
+  .notes-text .timing {
+    display: inline-block;
+    background: rgba(124, 58, 237, 0.2);
+    color: #A78BFA;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    letter-spacing: 0.03em;
+  }
+  .notes-text .cue {
+    color: #FBBF24;
+    font-weight: 700;
+    font-size: 16px;
+  }
+  .notes-text .key {
+    color: #FAFAFA;
+    font-weight: 600;
+  }
+  .notes-text .quote {
+    display: block;
+    border-left: 3px solid rgba(124, 58, 237, 0.5);
+    padding-left: 14px;
+    margin: 10px 0;
+    color: rgba(255,255,255,0.9);
+    font-style: italic;
+    font-size: 17px;
+  }
+
+  .notes-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .script-btn {
+    font-size: 11px;
+    font-weight: 700;
+    color: #7C3AED;
+    background: rgba(124, 58, 237, 0.1);
+    border: none;
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    letter-spacing: 0.03em;
+    transition: background 0.15s;
+  }
+  .script-btn:active { background: rgba(124, 58, 237, 0.2); }
+
+  .script-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: #09090B;
+    flex-direction: column;
+  }
+  .script-overlay.active { display: flex; }
+  .script-overlay .so-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #FAFAFA;
+  }
+  .script-overlay .so-close {
+    font-size: 14px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.4);
+    background: rgba(255,255,255,0.06);
+    border: none;
+    padding: 6px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: 'DM Sans', system-ui, sans-serif;
+  }
+  .script-overlay .so-nav-btn {
+    font-size: 18px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.5);
+    background: rgba(255,255,255,0.06);
+    border: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    flex-shrink: 0;
+  }
+  .script-overlay .so-nav-btn:active { background: rgba(255,255,255,0.12); }
+  .script-overlay .so-nav-btn:disabled { opacity: 0.2; }
+  .script-overlay .so-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 20px;
+    padding-bottom: max(14px, env(safe-area-inset-bottom));
+    gap: 10px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    flex-shrink: 0;
+  }
+  .script-overlay .so-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    -webkit-overflow-scrolling: touch;
+    font-size: 17px;
+    line-height: 1.75;
+    color: rgba(255,255,255,0.75);
+  }
+  .script-overlay .so-body .say {
+    display: block;
+    border-left: 3px solid #7C3AED;
+    padding: 8px 0 8px 14px;
+    margin: 12px 0;
+    color: rgba(255,255,255,0.9);
+    font-style: italic;
+  }
+  .script-overlay .so-body .stage {
+    color: #FBBF24;
+    font-style: italic;
+    font-size: 15px;
+  }
+  .script-overlay .so-body strong {
+    color: #FAFAFA;
+  }
+
+  .controls {
+    display: flex;
+    gap: 12px;
+    padding: 16px 20px;
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+    border-top: 1px solid rgba(255,255,255,0.08);
+    flex-shrink: 0;
+  }
+  .btn {
+    flex: 1;
+    height: 64px;
+    border: none;
+    border-radius: 14px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: transform 0.1s, opacity 0.15s;
+    -webkit-user-select: none;
+    user-select: none;
+    font-family: 'DM Sans', system-ui, sans-serif;
+  }
+  .btn:active { transform: scale(0.96); }
+  .btn-prev {
+    background: rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.7);
+  }
+  .btn-next {
+    background: #7C3AED;
+    color: #FFFFFF;
+  }
+  .btn:disabled {
+    opacity: 0.3;
+    cursor: default;
+    transform: none;
+  }
+  .btn .arrow { font-size: 20px; }
+</style>
+</head>
+<body>
+
+<!-- PIN Screen -->
+<div class="pin-screen" id="pinScreen">
+  <div class="lock-icon">&#128274;</div>
+  <h1>Presenter Remote</h1>
+  <p>Enter PIN to connect</p>
+  <input class="pin-input" id="pinInput" type="tel" maxlength="6" inputmode="numeric" autocomplete="off" autofocus />
+  <div class="pin-error-text" id="pinError">&nbsp;</div>
+  <button class="pin-btn" onclick="submitPin()">Connect</button>
+</div>
+
+<!-- Main Remote UI (hidden until auth) -->
+<div class="remote-ui" id="remoteUI">
+  <div class="header">
+    <span class="badge">Presenter Remote</span>
+    <span class="status">
+      <span class="dot" id="statusDot"></span>
+      <span id="statusText">Connected</span>
+    </span>
+  </div>
+
+  <div class="slide-counter">
+    <div class="num" id="slideNum">1</div>
+    <div class="of" id="slideOf">of 19</div>
+  </div>
+
+  <div class="slide-title" id="slideTitle">Generative AI & LLM Foundations</div>
+
+  <div class="progress-bar">
+    <div class="fill" id="progressFill" style="width: 0%"></div>
+  </div>
+
+  <div class="timer-bar">
+    <div class="timer-cell" id="sessionCell">
+      <div class="t-label">Session</div>
+      <div class="t-value" id="sessionTime">00:00</div>
+      <div class="t-start" id="sessionStart">tap to start</div>
+    </div>
+    <div class="timer-cell" id="slideCell">
+      <div class="t-label">This slide</div>
+      <div class="t-value" id="slideTime">0:00</div>
+      <div class="t-budget" id="slideBudget"></div>
+    </div>
+    <div class="pace-cell">
+      <div class="t-label">Pace</div>
+      <div class="pace-badge on-track" id="paceBadge">ready</div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <div class="notes-header">
+      <div class="notes-label" style="margin-bottom:0">Presenter Notes</div>
+      <button class="script-btn" id="scriptBtn" onclick="openScript()">Full script</button>
+    </div>
+    <div class="notes-text" id="notesText">Loading...</div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-prev" id="btnPrev" onclick="navigate(-1)">
+      <span class="arrow">&larr;</span> Prev
+    </button>
+    <button class="btn btn-next" id="btnNext" onclick="navigate(1)">
+      Next <span class="arrow">&rarr;</span>
+    </button>
+  </div>
+</div>
+
+<div class="script-overlay" id="scriptOverlay">
+  <div class="so-body" id="soBody"></div>
+  <div class="so-footer">
+    <button class="so-nav-btn" id="soPrev" onclick="scriptNav(-1)">&larr;</button>
+    <span class="so-title" id="soTitle">Full Script</span>
+    <button class="so-nav-btn" id="soNext" onclick="scriptNav(1)">&rarr;</button>
+    <button class="so-close" onclick="closeScript()">Close</button>
+  </div>
+</div>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const notes = [
+  { title: 'Generative AI & LLM Foundations', time: '~30s', notes: 'Intro yourself. "Session 1 of 3." Ground rules: not a lecture, shout questions anytime.|"In 30 min you\'ll understand how ChatGPT works under the hood — really understand it, not surface level."' },
+  { title: '30 minutes to understand AI', time: '~30s', notes: 'Point at each number. "Four parts: What GenAI is → how machines read language → inside an LLM → BERT and GPT."|"30 minutes. Let\'s go."' },
+  { title: "You've been using AI all week", time: '~1.5m', notes: '[ASK] "How many of you used ChatGPT this week?" Hands up.|Point at each card. Suno + Runway surprise people. "Every medium — text, image, code, art, music, video."|"You\'ve been using GenAI all week — you just didn\'t call it that."' },
+  { title: 'AI is a big word', time: '~1.5m', notes: '"Your washing machine has AI mode. Your phone camera has AI. What does it actually mean?"|Point outside→in: AI (1950s) → ML (data learns rules) → Deep Learning (2012, GPUs) → GenAI (creates, 2-3 yrs old).|"Russian nesting dolls. Each layer is stricter, more powerful, more recent."|If audience asks: "When your uncle says AI will take jobs — he means this innermost ring."' },
+  { title: 'Classify or create', time: '~1m', notes: '"Traditional AI classifies: cat or dog? GenAI creates: draw me a cat."|[ASK] "Which is harder?" Let them answer.|"Exactly. That\'s why it took until 2017 to crack it."' },
+  { title: 'How does a machine learn language?', time: '~1.5m', notes: 'Point at "bank" examples. You figured out the meaning instantly — using context.|[ASK] "Give me another word like this?" (bat, bark, crane, light, run)|"Teaching context to a machine that only sees numbers — that\'s the hard part."|This sets up WHY attention matters next.' },
+  { title: '"Attention is all you need"', time: '~2m', notes: '⭐ MOST IMPORTANT SLIDE.|"Before 2017 → reading through a keyhole. One word at a time."|Point at arcs: "Your brain doesn\'t read L→R on exams — you jump to key words. That\'s self-attention."|Paper: 8 Google researchers, 12 pages. Most left to start their own companies. Title almost rejected for being too bold.|Encourage them to read it — it\'s the paper that started everything.' },
+  { title: 'One architecture to rule them all', time: '~1m', notes: 'NO math. Use WhatsApp analogy: voice note in Hindi → English text. Understanding (encoder) + generating (decoder).|"Input → encoded into meaning → decoded into output. That\'s the entire Transformer."|"Everything you\'ve heard of — ChatGPT, BERT, Gemini, Claude — is this. One paper. 12 pages."' },
+  { title: 'One word at a time', time: '~2m', notes: '⚠️ LET ANIMATION RUN — silence is powerful here.|After a few steps: "This is literally how ChatGPT works. No understanding. No reasoning. Incredibly sophisticated pattern matching."|Temperature: low = predictable, high = creative.|"That\'s why ChatGPT gives different answers to the same question."|If asked: "So it doesn\'t think?" → "It simulates thinking through pattern matching at massive scale."' },
+  { title: 'How does it actually learn?', time: '~2m', notes: '"You already know how this works." When you were 2, you didn\'t learn English from grammar textbooks. You heard thousands of sentences. Brain learned patterns.|Point at net when it pulses. "Every connection = a weight = a number. Wrong guess → backpropagation → adjust weights."|"Not 7 examples — GPT-3 trained on 300 billion words. Every book ever written, times 50."' },
+  { title: 'Now scale it up', time: '~1.5m', notes: 'Point at tiny net: "19 nodes, 60 connections."|Circles L→R. Let dump truck line land.|"GPT-4 training cost $100M+. First Iron Man movie cost $140M. Same ballpark — except no actors, just electricity and math."|"Meta open-sourced LLaMA. Students in this room can download it."|If asked "can I run it?": Yes — LLaMA 7B runs on a gaming laptop. Slowly, but it works.' },
+  { title: 'Learn once, use everywhere', time: '~1.5m', notes: '"Pre-training = university degree. Fine-tuning = first job specialization."|GPT→ChatGPT, BERT→Google Search, LLaMA→Code Llama.|[ASK] "Why not train from scratch?" → $100M each time. Same foundation, different products.|If asked about cost: fine-tuning is 1000x cheaper than pre-training.' },
+  { title: 'The model that reads both ways', time: '~1.5m', notes: '⚠️ Let animation play fully.|"Arrows go BOTH ways. BERT sees the whole sentence before deciding."|Masked word → gathers context from both sides → predicts.|"Google Search has used BERT since 2019. Every search you do."|BERT = reader, not writer. Great at understanding, can\'t generate.' },
+  { title: 'The model that writes your emails', time: '~1.5m', notes: '⚠️ Let animation play.|"Arrows only go right. GPT can never look ahead. That constraint makes it a generator."|"When ChatGPT streams text word by word — that\'s literally this. Not thinking, just predicting."|"ChatGPT = GPT-4 + fine-tuning for conversation."|If asked about Claude/Gemini: same decoder architecture, different training data and techniques.' },
+  { title: 'Reader vs writer', time: '~1m', notes: '[ASK] "Which for Google Search?" → BERT. "Which for ChatGPT?" → GPT.|"Most modern models are decoder-only. If you make a decoder big enough, it understands pretty well too. That\'s the bet OpenAI made — and it paid off."|If asked "which is better?": depends on the task. Understanding vs generating.' },
+  { title: 'The elephant in the room', time: '~1.5m', notes: 'Hallucination: "A lawyer submitted ChatGPT briefs with fake case citations. Got sanctioned by the court."|Bias: "Trained on the internet — absorbs every bias in it."|Black box: 175B params, can\'t explain why.|XAI: making decisions transparent. Open research problem.|"Always verify AI output. Never blindly trust it."' },
+  { title: 'What to remember', time: '~45s', notes: 'Don\'t read the list — they can see it.|Go straight to the punchline:|"LLMs predict the next word. That\'s it. The intelligence, the creativity — just scale and clever training."|"175B parameters, trained on the entire internet, one word at a time. That\'s ChatGPT. That\'s the whole trick."|Pause. "Kind of beautiful in its simplicity, right?"' },
+  { title: "What's next?", time: '~45s', notes: '"Session 2 = prompt engineering — literally on job descriptions now. A real skill."|"Session 3 = AI agents that reason, plan, browse the web, write code autonomously. Things get wild."|"The foundation is set. Let\'s build on it."' },
+  { title: 'Thank You', time: 'Q&A ~3m', notes: '[ASK] "What surprised you the most?"|Backup: "What would you build?" / "What worries you about AI?"|If Session 2/3 questions: "Great question — exactly Session [2/3]."|If "Can AI think?": "Stochastic parrot — incredibly good one."|If "Will AI replace devs?": "It\'ll replace devs who don\'t use AI."|If "AGI?": "Not there yet. Great at language, fails at basic reasoning a 5-yr-old can do. But gap is closing."' },
+];
+
+const totalSlides = notes.length;
+let current = 0;
+let authToken = null;
+const socket = io({ transports: ['websocket'] });
+
+function updateUI() {
+  document.getElementById('slideNum').textContent = current + 1;
+  document.getElementById('slideOf').textContent = `of ${totalSlides}`;
+  document.getElementById('slideTitle').textContent = notes[current]?.title || '';
+  document.getElementById('progressFill').style.width = ((current + 1) / totalSlides * 100) + '%';
+  document.getElementById('btnPrev').disabled = current <= 0;
+  document.getElementById('btnNext').disabled = current >= totalSlides - 1;
+
+  const note = notes[current];
+  if (!note) return;
+
+  let html = '';
+  if (note.time) {
+    html += `<span class='timing'>${note.time}</span><br>`;
+  }
+  const bullets = (note.notes || '').split('|');
+  bullets.forEach(b => {
+    let line = b.trim();
+
+    line = line.replace(/"([^"]+)"/g, '<span class=\'key\'>"$1"</span>');
+
+    line = line.replace(/\[ASK\]/g, '<span class=\'cue\'>[ASK]</span>');
+    line = line.replace(/⚠️/g, '<span class=\'cue\'>⚠️</span>');
+    line = line.replace(/⭐/g, '<span class=\'cue\'>⭐</span>');
+
+    if (b.trim().startsWith('"') && b.trim().endsWith('"')) {
+      const raw = b.trim().slice(1, -1);
+      html += `<span class='quote'>"${raw}"</span>`;
+    } else {
+      html += `• ${line}<br>`;
+    }
+  });
+  document.getElementById('notesText').innerHTML = html;
+}
+
+function navigate(dir) {
+  onSlideChange();
+  socket.emit('navigate', dir);
+}
+
+async function submitPin() {
+  const pin = document.getElementById('pinInput').value.trim();
+  const input = document.getElementById('pinInput');
+  const error = document.getElementById('pinError');
+
+  if (!pin) {
+    input.classList.add('error');
+    error.textContent = 'Enter a PIN';
+    setTimeout(() => input.classList.remove('error'), 400);
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin }),
+    });
+    const data = await res.json();
+
+    if (data.ok) {
+      authToken = data.token;
+      socket.emit('auth', authToken);
+    } else {
+      input.classList.add('error');
+      error.textContent = 'Wrong PIN';
+      input.value = '';
+      setTimeout(() => input.classList.remove('error'), 400);
+    }
+  } catch {
+    error.textContent = 'Connection error';
+  }
+}
+
+document.getElementById('pinInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') submitPin();
+});
+
+socket.on('connect', () => {
+  const statusEl = document.querySelector('.header .status');
+  document.getElementById('statusDot')?.classList.add('connected');
+  document.getElementById('statusText').textContent = 'Connected';
+  statusEl?.classList.remove('retrying');
+  if (authToken) socket.emit('auth', authToken);
+});
+
+socket.on('disconnect', () => {
+  document.getElementById('statusDot')?.classList.remove('connected');
+  document.getElementById('statusText').textContent = 'Tap to reconnect';
+});
+
+document.querySelector('.header .status')?.addEventListener('click', () => {
+  if (socket.connected) return;
+  const statusEl = document.querySelector('.header .status');
+  statusEl?.classList.add('retrying');
+  document.getElementById('statusText').textContent = 'Reconnecting…';
+  socket.connect();
+});
+
+socket.on('auth_ok', () => {
+  document.getElementById('pinScreen').style.display = 'none';
+  document.getElementById('remoteUI').classList.add('active');
+  updateUI();
+});
+
+socket.on('auth_fail', () => {
+  const input = document.getElementById('pinInput');
+  const error = document.getElementById('pinError');
+  input.classList.add('error');
+  error.textContent = 'Authentication failed';
+  input.value = '';
+  setTimeout(() => input.classList.remove('error'), 400);
+});
+
+socket.on('state', (s) => {
+  current = s.current || 0;
+  updateUI();
+});
+
+socket.on('navigate', (dir) => {
+  const next = current + dir;
+  if (next >= 0 && next < totalSlides) {
+    current = next;
+    onSlideChange();
+    updateUI();
+    refreshScriptIfOpen();
+  }
+});
+
+socket.on('goto', (idx) => {
+  current = idx;
+  onSlideChange();
+  updateUI();
+  refreshScriptIfOpen();
+});
+
+updateUI();
+
+// --- Timer system ---
+const SESSION_TARGET = 30 * 60;
+
+function parseTimeStr(str) {
+  if (!str) return 60;
+  const m = str.match(/([\d.]+)\s*m/);
+  if (m) return Math.round(parseFloat(m[1]) * 60);
+  const s = str.match(/([\d.]+)\s*s/);
+  if (s) return Math.round(parseFloat(s[1]));
+  return 60;
+}
+
+const slideBudgets = notes.map(n => parseTimeStr(n.time));
+const cumulativeDepart = [];
+slideBudgets.reduce((acc, b, i) => { cumulativeDepart[i] = acc + b; return acc + b; }, 0);
+
+let sessionStart = null;
+let slideStart = null;
+let sessionPaused = false;
+let pauseOffset = 0;
+let pausedAt = null;
+
+function fmtTime(secs) {
+  const m = Math.floor(secs / 60);
+  const s = Math.floor(secs % 60);
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+function fmtShort(secs) {
+  const m = Math.floor(secs / 60);
+  const s = Math.floor(secs % 60);
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function getNow() {
+  return sessionPaused ? pausedAt : Date.now();
+}
+
+function startSession() {
+  if (sessionStart) return;
+  const t = Date.now();
+  sessionStart = t;
+  slideStart = t;
+  const startEl = document.getElementById('sessionStart');
+  if (startEl) startEl.textContent = '/ 30:00';
+  startEl.className = 't-budget';
+  setInterval(updateTimers, 500);
+  updateTimers();
+}
+
+function onSlideChange() {
+  startSession();
+  slideStart = getNow();
+  updateTimers();
+}
+
+function updateTimers() {
+  if (!sessionStart) return;
+
+  const now = getNow();
+  const elapsed = (now - sessionStart - pauseOffset) / 1000;
+  const slideElapsed = Math.max(0, (now - slideStart) / 1000);
+
+  const sessionEl = document.getElementById('sessionTime');
+  const sessionCell = document.getElementById('sessionCell');
+  sessionEl.textContent = fmtTime(elapsed);
+  sessionCell.classList.remove('warn', 'over');
+  if (elapsed >= SESSION_TARGET) sessionCell.classList.add('over');
+  else if (elapsed >= SESSION_TARGET - 300) sessionCell.classList.add('warn');
+
+  const slideEl = document.getElementById('slideTime');
+  const slideCell = document.getElementById('slideCell');
+  const budget = slideBudgets[current] || 60;
+  slideEl.textContent = fmtShort(slideElapsed);
+  document.getElementById('slideBudget').textContent = `/ ${fmtShort(budget)}`;
+  slideCell.classList.remove('warn', 'over');
+  if (slideElapsed >= budget * 1.5) slideCell.classList.add('over');
+  else if (slideElapsed >= budget) slideCell.classList.add('warn');
+
+  const badge = document.getElementById('paceBadge');
+  badge.className = 'pace-badge';
+  if (elapsed < 5) {
+    badge.textContent = 'ready';
+    badge.classList.add('on-track');
+  } else {
+    let expectedSlide = 0;
+    for (let i = 0; i < cumulativeDepart.length; i++) {
+      if (elapsed < cumulativeDepart[i]) { expectedSlide = i; break; }
+      expectedSlide = i;
+    }
+    const diff = current - expectedSlide;
+    if (diff >= 2) {
+      badge.textContent = 'ahead';
+      badge.classList.add('ahead');
+    } else if (diff >= 0) {
+      badge.textContent = 'on track';
+      badge.classList.add('on-track');
+    } else if (diff >= -2) {
+      badge.textContent = 'behind';
+      badge.classList.add('behind');
+    } else {
+      badge.textContent = 'over';
+      badge.classList.add('over-time');
+    }
+  }
+}
+
+document.getElementById('sessionCell').addEventListener('click', () => {
+  if (!sessionStart) {
+    startSession();
+    return;
+  }
+  if (sessionPaused) {
+    const pauseDuration = Date.now() - pausedAt;
+    pauseOffset += pauseDuration;
+    slideStart += pauseDuration;
+    pausedAt = null;
+    sessionPaused = false;
+    document.getElementById('sessionCell').style.opacity = '1';
+    updateTimers();
+  } else {
+    pausedAt = Date.now();
+    sessionPaused = true;
+    document.getElementById('sessionCell').style.opacity = '0.5';
+  }
+});
+
+// --- Full script overlay ---
+let scriptSections = null;
+
+async function loadScript() {
+  if (scriptSections) return scriptSections;
+  try {
+    const res = await fetch('/api/script');
+    const md = await res.text();
+    const parts = md.split(/^## Slide \d+/m);
+    parts.shift();
+    scriptSections = parts.map(section => {
+      const lines = section.split('\n');
+      lines.shift();
+      return lines.join('\n').trim();
+    });
+    return scriptSections;
+  } catch {
+    return null;
+  }
+}
+
+function renderScript(text) {
+  let html = text
+    .replace(/\*\*→ NEXT\*\*/g, '')
+    .replace(/^---$/gm, '')
+    .replace(/^\*\*\[([^\]]+)\]\*\*$/gm, '<span class="timing" style="display:inline-block;margin:8px 0">$1</span>')
+    .replace(/^>\s*(.*)$/gm, '<span class="say">$1</span>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*\(([^)]+)\)\*/g, '<span class="stage">($1)</span>')
+    .replace(/\*([^*]+)\*/g, '<span class="stage">$1</span>')
+    .replace(/\n\n+/g, '</p><p>')
+    .replace(/\n/g, '<br>');
+  html = '<p>' + html + '</p>';
+  html = html.replace(/<p>\s*<\/p>/g, '');
+  return html;
+}
+
+async function openScript() {
+  const overlay = document.getElementById('scriptOverlay');
+  const body = document.getElementById('soBody');
+  document.getElementById('soTitle').textContent = `Slide ${current + 1} — ${notes[current]?.title || ''}`;
+  body.innerHTML = '<p style="color:rgba(255,255,255,0.3)">Loading…</p>';
+  overlay.classList.add('active');
+  document.getElementById('soPrev').disabled = current <= 0;
+  document.getElementById('soNext').disabled = current >= totalSlides - 1;
+
+  const sections = await loadScript();
+  if (sections && sections[current]) {
+    body.innerHTML = renderScript(sections[current]);
+  } else {
+    body.innerHTML = '<p style="color:rgba(255,255,255,0.3)">No script available for this slide.</p>';
+  }
+  body.scrollTop = 0;
+}
+
+function closeScript() {
+  document.getElementById('scriptOverlay').classList.remove('active');
+}
+
+function refreshScriptIfOpen() {
+  const overlay = document.getElementById('scriptOverlay');
+  if (overlay.classList.contains('active') && scriptSections) {
+    document.getElementById('soTitle').textContent = `Slide ${current + 1} — ${notes[current]?.title || ''}`;
+    const body = document.getElementById('soBody');
+    body.innerHTML = scriptSections[current]
+      ? renderScript(scriptSections[current])
+      : '<p style="color:rgba(255,255,255,0.3)">No script for this slide.</p>';
+    body.scrollTop = 0;
+    document.getElementById('soPrev').disabled = current <= 0;
+    document.getElementById('soNext').disabled = current >= totalSlides - 1;
+  }
+}
+
+function scriptNav(dir) {
+  const next = current + dir;
+  if (next < 0 || next >= totalSlides) return;
+  onSlideChange();
+  socket.emit('navigate', dir);
+}
+</script>
+</body>
+</html>
